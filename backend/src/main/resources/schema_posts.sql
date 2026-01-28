@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS posts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     content TEXT,
-    image_url VARCHAR(255),
+    image_url TEXT,
     like_count INT DEFAULT 0,
     comment_count INT DEFAULT 0,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,

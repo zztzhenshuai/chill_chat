@@ -20,4 +20,10 @@ public class Friend {
     private String friendAvatar;
     @TableField(exist = false)
     private String friendSignature;
+    @TableField(exist = false)
+    private Integer friendGender;
+    @TableField(exist = false)
+    private java.util.Date friendBirthday;
+    @TableField(exist = false)
+    private String friendLocation;
 }

@@ -4,6 +4,10 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(100) NOT NULL,
     avatar VARCHAR(255),
+    signature VARCHAR(255),
+    gender INT DEFAULT 0 COMMENT '0: Unknown, 1: Male, 2: Female',
+    birthday DATE,
+    location VARCHAR(255),
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

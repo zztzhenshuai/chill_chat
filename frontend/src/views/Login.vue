@@ -21,7 +21,7 @@ const handleSubmit = async () => {
     const res = await axios.post(endpoint, formData.value)
     
     if (isRegister.value) {
-      ElMessage.success('Registered! Please login.')
+      ElMessage.success('注册成功！请登录')
       isRegister.value = false
     } else {
       // Login success
@@ -31,11 +31,11 @@ const handleSubmit = async () => {
       localStorage.setItem('chill_username', username)
       localStorage.setItem('chill_avatar', avatar)
       
-      ElMessage.success('Welcome back, ' + username)
+      ElMessage.success('欢迎回来, ' + username)
       router.push('/app/chat')
     }
   } catch (err: any) {
-    ElMessage.error(err.response?.data || 'Operation failed')
+    ElMessage.error(err.response?.data || '操作失败')
   } finally {
     loading.value = false
   }
@@ -49,7 +49,7 @@ const handleSubmit = async () => {
       
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700">Username</label>
+          <label class="block text-sm font-medium text-gray-700">用户名</label>
           <input 
             v-model="formData.username"
             type="text" 
@@ -58,7 +58,7 @@ const handleSubmit = async () => {
         </div>
 
         <div>
-           <label class="block text-sm font-medium text-gray-700">Password</label>
+           <label class="block text-sm font-medium text-gray-700">密码</label>
            <input 
              v-model="formData.password"
              type="password" 
@@ -71,11 +71,11 @@ const handleSubmit = async () => {
           :disabled="loading"
           class="w-full bg-chill-blue text-white py-2 rounded-md hover:bg-blue-600 transition disabled:opacity-50"
         >
-          {{ loading ? 'Processing...' : (isRegister ? 'Register' : 'Login') }}
+          {{ loading ? '处理中...' : (isRegister ? '注册' : '登录') }}
         </button>
 
         <div class="text-center text-sm text-gray-500 cursor-pointer hover:text-chill-blue" @click="isRegister = !isRegister">
-          {{ isRegister ? 'Already have account? Login' : 'No account? Register' }}
+          {{ isRegister ? '已有账号？去登录' : '没有账号？去注册' }}
         </div>
       </div>
     </div>

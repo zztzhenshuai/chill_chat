@@ -16,5 +16,8 @@ public class User {
     private String password;
     private String avatar;
     private String signature;
+    private Integer gender; // 1: Male, 2: Female
+    private Date birthday;
+    private String location;
     private Date createTime;
 }
