@@ -27,6 +27,9 @@ public class KafkaConsumerService {
     @Autowired
     private GroupMemberMapper groupMemberMapper;
 
+    @Autowired
+    private BotService botService;
+
     // @KafkaListener(topics = "chat-msg-topic", groupId = "chill-chat-group")
     // public void consume(List<ConsumerRecord<String, String>> records) { ... }
 
@@ -77,6 +80,10 @@ public class KafkaConsumerService {
                      // System.out.println("User offline: " + chatMessage.getTargetId());
                 }
             }
+
+            // 3. Trigger Bot Response (Async)
+            botService.handleBotResponse(chatMessage);
+            
         } catch (Exception e) {
             e.printStackTrace();
         }

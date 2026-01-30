@@ -13,6 +13,7 @@ import java.util.List;
 
 import com.chillchat.mapper.FriendRequestMapper;
 import com.chillchat.entity.FriendRequest;
+import com.chillchat.netty.handler.TextWebSocketFrameHandler;
 import java.time.LocalDateTime;
 
 @RestController
@@ -30,7 +31,16 @@ public class FriendController {
 
     @GetMapping
     public List<Friend> getFriends(@RequestParam Long userId) {
-        return friendMapper.selectFriendsWithInfo(userId);
+        List<Friend> friends = friendMapper.selectFriendsWithInfo(userId);
+        for (Friend f : friends) {
+             if ("ChillBot".equals(f.getFriendName())) {
+                f.setIsOnline(true);
+            } else {
+                boolean isOnline = TextWebSocketFrameHandler.userChannelMap.containsKey(f.getFriendId());
+                f.setIsOnline(isOnline);
+            }
+        }
+        return friends;
     }
 
     @DeleteMapping("/delete")

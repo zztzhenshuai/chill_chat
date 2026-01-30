@@ -43,8 +43,8 @@ const handleImageClick = () => {
 
     <!-- Bubble -->
     <div 
-      class="max-w-[70%] rounded-2xl p-3 shadow-sm relative text-sm backdrop-blur-sm"
-      :class="msg.isSelf ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-tr-none shadow-indigo-200' : 'bg-white/80 text-gray-800 rounded-tl-none border border-white/50'"
+      class="max-w-[70%] rounded-2xl p-3 shadow-sm relative text-sm backdrop-blur-sm transition-colors duration-300"
+      :class="msg.isSelf ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-tr-none shadow-indigo-200 dark:shadow-none' : 'bg-white/80 dark:bg-gray-700/90 text-gray-800 dark:text-gray-100 rounded-tl-none border border-white/50 dark:border-gray-600/50'"
     >
       <div v-if="msg.content.startsWith('http')" class="image-content group">
          <img 

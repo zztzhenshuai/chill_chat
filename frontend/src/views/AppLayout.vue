@@ -1,15 +1,56 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
-import { Plus, User, Setting, SwitchButton, Lock } from '@element-plus/icons-vue'
+import { Plus, User, Setting, SwitchButton, Lock, Moon, Sunny } from '@element-plus/icons-vue'
 import { chatSocket } from '@/services/websocket'
 
 const router = useRouter()
 const currentRoute = router.currentRoute
 const currentUserId = Number(localStorage.getItem('chill_user_id'))
 const showProfileModal = ref(false)
+const isDark = ref(localStorage.getItem('theme') === 'dark')
+
+const toggleTheme = () => {
+    isDark.value = !isDark.value
+    if (isDark.value) {
+        document.documentElement.classList.add('dark')
+        localStorage.setItem('theme', 'dark')
+    } else {
+        document.documentElement.classList.remove('dark')
+        localStorage.setItem('theme', 'light')
+    }
+}
+
+const handleStorageChange = (e: StorageEvent) => {
+    if (e.key === 'theme') {
+        const newVal = e.newValue === 'dark'
+        if (isDark.value !== newVal) {
+            isDark.value = newVal
+            if (newVal) {
+                document.documentElement.classList.add('dark')
+            } else {
+                document.documentElement.classList.remove('dark')
+            }
+        }
+    }
+}
+
+// Init theme
+onMounted(() => {
+    if (isDark.value) {
+        document.documentElement.classList.add('dark')
+    } else {
+        document.documentElement.classList.remove('dark')
+    }
+    window.addEventListener('storage', handleStorageChange)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('storage', handleStorageChange)
+})
+
 const profileForm = ref({
   username: localStorage.getItem('chill_username') || '',
   avatar: localStorage.getItem('chill_avatar') || '',
@@ -95,30 +136,41 @@ const logout = () => {
 </script>
 
 <template>
-  <div class="flex h-screen bg-chill-bg overflow-hidden">
+  <div class="flex h-screen bg-chill-bg dark:bg-gray-900 overflow-hidden transition-colors duration-300">
     <!-- Main Sidebar -->
-    <div class="w-16 bg-white border-r flex flex-col items-center py-4 space-y-6 z-20">
+    <div class="w-16 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col items-center py-4 space-y-6 z-20 transition-colors duration-300">
       <div class="w-10 h-10 bg-chill-blue rounded-lg flex items-center justify-center text-white font-bold cursor-pointer shadow-md hover:shadow-lg transition">
         CC
       </div>
 
       <div 
         @click="navigate('/app/chat')"
-        class="p-2 rounded-lg cursor-pointer transition hover:bg-gray-100"
-        :class="currentRoute.path.includes('chat') ? 'text-chill-blue bg-blue-50' : 'text-gray-400'"
+        class="p-2 rounded-lg cursor-pointer transition hover:bg-gray-100 dark:hover:bg-gray-700"
+        :class="currentRoute.path.includes('chat') ? 'text-chill-blue bg-blue-50 dark:bg-gray-700' : 'text-gray-400 dark:text-gray-500'"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
       </div>
 
       <div 
         @click="navigate('/app/square')"
-        class="p-2 rounded-lg cursor-pointer transition hover:bg-gray-100"
-        :class="currentRoute.path.includes('square') ? 'text-chill-blue bg-blue-50' : 'text-gray-400'"
+        class="p-2 rounded-lg cursor-pointer transition hover:bg-gray-100 dark:hover:bg-gray-700"
+        :class="currentRoute.path.includes('square') ? 'text-chill-blue bg-blue-50 dark:bg-gray-700' : 'text-gray-400 dark:text-gray-500'"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
       </div>
 
       <div class="flex-1"></div>
+
+      <!-- Theme Toggle -->
+      <div 
+        @click="toggleTheme"
+        class="w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition border"
+        :class="isDark ? 'bg-gray-800 border-gray-700 text-yellow-500 hover:text-yellow-400 hover:bg-gray-700' : 'bg-white border-gray-200 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50'"
+        :title="isDark ? '切换亮色模式' : '切换深色模式'"
+      >
+         <el-icon :size="20" v-if="isDark"><Sunny /></el-icon>
+         <el-icon :size="20" v-else><Moon /></el-icon>
+      </div>
 
       <!-- Profile -->
       <div 

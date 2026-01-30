@@ -26,4 +26,6 @@ public class Friend {
     private java.util.Date friendBirthday;
     @TableField(exist = false)
     private String friendLocation;
+    @TableField(exist = false)
+    private Boolean isOnline;
 }

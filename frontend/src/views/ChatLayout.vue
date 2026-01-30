@@ -48,6 +48,15 @@ const openPreview = (url: string) => {
 }
 
 const userCache = ref<Record<number, any>>({})
+const unreadCounts = ref<Record<string, number>>({})
+
+// Search Query
+const searchQuery = ref('')
+const filteredFriends = computed(() => {
+    if (!searchQuery.value) return friends.value
+    const q = searchQuery.value.toLowerCase()
+    return friends.value.filter(f => f.name.toLowerCase().includes(q) || (f.signature && f.signature.toLowerCase().includes(q)))
+})
 
 // Real Friend List
 const friends = ref<any[]>([])
@@ -131,7 +140,9 @@ const loadFriends = async () => {
   // Load friends
   try {
     const res = await axios.get('/api/friends', { params: { userId: currentUserId } })
-    friends.value = res.data.map((f: any) => {
+    
+    // Map and Cache first
+    const list = res.data.map((f: any) => {
         const u = {
           id: f.friendId,
           name: f.friendName,
@@ -140,11 +151,22 @@ const loadFriends = async () => {
           gender: f.friendGender,
           birthday: f.friendBirthday,
           location: f.friendLocation,
+          isOnline: f.isOnline,
           isGroup: false
         }
         // Cache friend info
         userCache.value[f.friendId] = u
         return u
+    })
+
+    // Sort: ChillBot first, then Online status
+    friends.value = list.sort((a: any, b: any) => {
+        if (a.name === 'ChillBot') return -1;
+        if (b.name === 'ChillBot') return 1;
+        // Then sort by online status
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+        return 0;
     })
     
     // Cache self
@@ -220,9 +242,7 @@ const deleteFriend = async () => {
     } catch(err) { ElMessage.error('删除失败') }
 }
 
-const filteredFriends = computed(() => {
-  return friends.value
-})
+
 
 // Select Chat
 const selectChat = async (id: number, group: boolean) => {
@@ -230,6 +250,11 @@ const selectChat = async (id: number, group: boolean) => {
   
   targetId.value = id
   isGroup.value = group
+
+  // Clear unread count
+  const key = (group ? 'g-' : 'f-') + id
+  unreadCounts.value[key] = 0
+  
   messages.value = [] // Setup UI for loading
 
   await loadHistory()
@@ -302,6 +327,15 @@ onMounted(() => {
   loadFriends()
 
   chatSocket.onMessageCallback = (msg) => {
+    // Handle ONLINE Status updates
+    if (msg.type === 'STATUS') {
+        const friend = friends.value.find(f => f.id === msg.senderId)
+        if (friend) {
+            friend.isOnline = (msg.content === 'ONLINE')
+        }
+        return
+    }
+
     // Only show if it matches current chat
     const isRelevant = (msg.isGroup && msg.targetId === targetId.value) || 
                        (!msg.isGroup && (msg.senderId === targetId.value || (msg.senderId === currentUserId && msg.targetId === targetId.value)))
@@ -315,6 +349,14 @@ onMounted(() => {
       scrollToBottomIfNear()
     } else {
       // Store unread or notify
+      if (msg.isGroup) {
+          const key = 'g-' + msg.targetId
+          unreadCounts.value[key] = (unreadCounts.value[key] || 0) + 1
+      } else {
+          // Private message
+          const key = 'f-' + msg.senderId
+          unreadCounts.value[key] = (unreadCounts.value[key] || 0) + 1
+      }
       ElMessage.info(`来自 ${msg.senderId} 的新消息`)
     }
   }
@@ -454,14 +496,22 @@ const isSelectedUserFriend = computed(() => {
 </script>
 
 <template>
-  <div class="flex h-full w-full bg-white">
+  <div class="flex h-full w-full bg-white dark:bg-gray-900 transition-colors duration-300">
     <!-- Sidebar -->
     <div 
-      class="border-r border-gray-200 flex flex-col flex-shrink-0"
+      class="border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0 bg-white dark:bg-gray-800 transition-colors duration-300"
       :style="{ width: sidebarWidth + 'px' }"
     >
       <div class="p-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white flex justify-center items-center shadow-md">
         <span class="font-bold text-xl tracking-wider animate-pulse font-serif italic">Chill Chat</span>
+      </div>
+      
+      <div class="px-3 pb-2 mt-2">
+         <input 
+            v-model="searchQuery" 
+            placeholder="搜索好友..." 
+            class="w-full bg-gray-100 dark:bg-gray-700 border-none rounded px-3 py-1.5 text-xs focus:ring-1 focus:ring-chill-blue outline-none text-gray-600 dark:text-gray-200 transaction-colors"
+         />
       </div>
       
       <div class="overflow-y-auto flex-1">
@@ -470,7 +520,7 @@ const isSelectedUserFriend = computed(() => {
         <div>
           <div 
              @click="showGroups = !showGroups"
-             class="px-4 py-2 bg-gray-100 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 select-none flex justify-between"
+             class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 select-none flex justify-between transition-colors"
           >
             <span>群组 ({{groups.length}})</span>
             <span>{{ showGroups ? '▼' : '▶' }}</span>
@@ -480,13 +530,13 @@ const isSelectedUserFriend = computed(() => {
               <div 
                 v-for="group in groups" 
                 :key="'g-' + group.id"
-                class="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition"
-                :class="(targetId === group.id && isGroup) ? 'bg-blue-50' : ''"
+                class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
+                :class="(targetId === group.id && isGroup) ? 'bg-blue-50 dark:bg-indigo-900/30' : ''"
                 @click="selectChat(group.id, true)"
               >
-                <img :src="group.avatar" class="w-10 h-10 rounded-full mr-3 border border-gray-200" />
+                <img :src="group.avatar" class="w-10 h-10 rounded-full mr-3 border border-gray-200 dark:border-gray-600" />
                 <div>
-                  <div class="text-sm font-medium text-gray-800">{{ group.name }}</div>
+                  <div class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ group.name }}</div>
                   <div class="text-xs text-gray-400">群聊</div>
                 </div>
               </div>
@@ -497,7 +547,7 @@ const isSelectedUserFriend = computed(() => {
         <div>
            <div 
               @click="showFriends = !showFriends"
-              class="px-4 py-2 bg-gray-100 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-200 select-none flex justify-between"
+              class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 select-none flex justify-between transition-colors"
            >
               <span>好友列表 ({{friends.length}})</span>
               <span>{{ showFriends ? '▼' : '▶' }}</span>
@@ -507,18 +557,38 @@ const isSelectedUserFriend = computed(() => {
             <div 
               v-for="friend in filteredFriends" 
               :key="'f-' + friend.id"
-              class="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition"
-              :class="(targetId === friend.id && !isGroup) ? 'bg-blue-50' : ''"
+              class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
+              :class="(targetId === friend.id && !isGroup) ? 'bg-blue-50 dark:bg-indigo-900/30' : ''"
               @click="selectChat(friend.id, false)"
             >
-              <img 
-                :src="friend.avatar" 
-                @click.stop="openFriendInfo(friend)"
-                class="w-10 h-10 rounded-full mr-3 hover:opacity-80 transition" 
-              />
-              <div>
-                <div class="text-sm font-medium text-gray-800">{{ friend.name }}</div>
-                <div class="text-xs text-gray-400 truncate w-32">{{ friend.signature }}</div>
+              <div class="relative mr-3">
+                  <img 
+                    :src="friend.avatar" 
+                    @click.stop="openFriendInfo(friend)"
+                    class="w-10 h-10 rounded-full hover:opacity-80 transition" 
+                  />
+                  <!-- Online Status -->
+                  <div 
+                    v-if="friend.isOnline"
+                    class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"
+                  ></div>
+                  <div 
+                    v-else
+                    class="absolute bottom-0 right-0 w-3 h-3 bg-gray-400 rounded-full border-2 border-white dark:border-gray-800"
+                  ></div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-center">
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ friend.name }}</div>
+                    <!-- Unread Badge -->
+                    <div 
+                        v-if="unreadCounts['f-' + friend.id] > 0"
+                        class="bg-red-500 text-white text-[10px] h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center font-bold"
+                    >
+                        {{ unreadCounts['f-' + friend.id] > 99 ? '99+' : unreadCounts['f-' + friend.id] }}
+                    </div>
+                </div>
+                <div class="text-xs text-gray-400 dark:text-gray-500 truncate w-32">{{ friend.signature }}</div>
               </div>
             </div>
           </div>
@@ -526,11 +596,11 @@ const isSelectedUserFriend = computed(() => {
 
       </div>
       
-      <div class="p-3 border-t space-y-2">
+      <div class="p-3 border-t space-y-2 border-gray-200 dark:border-gray-700">
          <!-- Create Group Button -->
          <button 
            @click="showCreateGroupModal = true"
-           class="w-full bg-indigo-50 text-indigo-600 py-1.5 rounded text-sm hover:bg-indigo-100 transition border border-indigo-200"
+           class="w-full bg-indigo-50 dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 py-1.5 rounded text-sm hover:bg-indigo-100 dark:hover:bg-gray-700 transition border border-indigo-200 dark:border-gray-600"
          >
            + 新建群组
          </button>
@@ -538,7 +608,7 @@ const isSelectedUserFriend = computed(() => {
          <button 
            v-if="pendingRequests.length > 0"
            @click="showRequestsModal = true"
-           class="w-full bg-orange-100 text-orange-600 py-1.5 rounded text-sm hover:bg-orange-200 transition flex justify-center items-center"
+           class="w-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 py-1.5 rounded text-sm hover:bg-orange-200 dark:hover:bg-orange-900/50 transition flex justify-center items-center"
          >
            好友请求 <span class="ml-2 bg-orange-600 text-white rounded-full px-2 text-xs">{{pendingRequests.length}}</span>
          </button>
@@ -555,22 +625,22 @@ const isSelectedUserFriend = computed(() => {
 
     <!-- Resizer Handle -->
     <div
-        class="w-1 hover:bg-blue-400 cursor-col-resize bg-gray-50 hover:shadow-lg transition-colors flex-shrink-0 z-20 flex items-center justify-center group"
+        class="w-1 hover:bg-blue-400 cursor-col-resize bg-gray-50 dark:bg-gray-700 hover:shadow-lg transition-colors flex-shrink-0 z-20 flex items-center justify-center group"
         :class="isResizing ? 'bg-blue-500' : ''"
         @mousedown.prevent="startResize"
     >
-       <div class="h-8 w-0.5 bg-gray-300 group-hover:bg-white rounded"></div>
+       <div class="h-8 w-0.5 bg-gray-300 dark:bg-gray-500 group-hover:bg-white rounded"></div>
     </div>
 
     <!-- Chat Area -->
-    <div class="flex-1 flex flex-col relative w-0 overflow-hidden bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/30">
+    <div class="flex-1 flex flex-col relative w-0 overflow-hidden bg-gradient-to-br from-slate-50 dark:from-gray-900 via-indigo-50/30 dark:via-indigo-900/10 to-purple-50/30 dark:to-purple-900/10 transition-colors duration-300">
       <!-- Background Blobs -->
       <div class="absolute top-20 left-20 w-80 h-80 bg-indigo-400 rounded-full filter blur-[80px] opacity-25 animate-blob pointer-events-none"></div>
       <div class="absolute bottom-20 right-20 w-80 h-80 bg-purple-400 rounded-full filter blur-[80px] opacity-25 animate-blob animation-delay-2000 pointer-events-none"></div>
 
       <!-- Header -->
-      <div class="h-14 border-b border-white/40 bg-white/70 backdrop-blur-md flex items-center px-4 justify-between shadow-sm z-10 relative">
-        <span class="font-bold text-gray-800 tracking-wide">
+      <div class="h-14 border-b border-white/40 dark:border-gray-700/50 bg-white/70 dark:bg-gray-800/80 backdrop-blur-md flex items-center px-4 justify-between shadow-sm z-10 relative transition-colors duration-300">
+        <span class="font-bold text-gray-800 dark:text-gray-100 tracking-wide">
           {{ targetId ? (isGroup ? (groups.find(g => g.id === targetId)?.name || '群组 ' + targetId) : (userCache[targetId]?.name || '用户 ' + targetId)) : '选择一个聊天' }}
         </span>
       </div>
@@ -654,22 +724,22 @@ const isSelectedUserFriend = computed(() => {
     <!-- Input Resize Handle -->
      <div 
         v-if="targetId"
-        class="h-1 bg-gray-50 hover:bg-blue-400 cursor-row-resize hover:shadow-lg transition-colors z-20 flex items-center justify-center group border-t border-gray-200"
+        class="h-1 bg-gray-50 dark:bg-gray-800 hover:bg-blue-400 cursor-row-resize hover:shadow-lg transition-colors z-20 flex items-center justify-center group border-t border-gray-200 dark:border-gray-700"
          :class="isResizingInput ? 'bg-blue-500' : ''"
         @mousedown.prevent="startResizeInput"
       >
-        <div class="w-8 h-0.5 bg-gray-300 group-hover:bg-white rounded"></div>
+        <div class="w-8 h-0.5 bg-gray-300 dark:bg-gray-500 group-hover:bg-white rounded"></div>
       </div>
 
     <!-- - Input Area -->
       <div 
         v-if="targetId" 
-        class="bg-white p-3 flex flex-col"
+        class="bg-white dark:bg-gray-800 p-3 flex flex-col transition-colors duration-300"
         :style="{ height: inputHeight + 'px' }"
       >
         <!-- Toolbar -->
         <div class="flex space-x-3 mb-2 px-1">
-          <label class="cursor-pointer text-gray-500 hover:text-chill-blue transition">
+          <label class="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-chill-blue transition">
             <input type="file" class="hidden" accept="image/*" @change="handleFileUpload" />
             <el-icon :size="20"><Picture /></el-icon>
           </label>
@@ -678,7 +748,7 @@ const isSelectedUserFriend = computed(() => {
         <textarea 
           v-model="inputText"
           @keydown.ctrl.enter="sendMessage"
-          class="flex-1 resize-none outline-none text-sm bg-transparent"
+          class="flex-1 resize-none outline-none text-sm bg-transparent text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
           placeholder="输入消息 (Ctrl+Enter 发送)..."
         ></textarea>
         

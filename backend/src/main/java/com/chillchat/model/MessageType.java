@@ -5,5 +5,6 @@ public enum MessageType {
     CHAT,
     ACK,
     PING,
-    PONG
+    PONG,
+    STATUS
 }

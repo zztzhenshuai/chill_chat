@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export type MessageType = 'CONNECT' | 'CHAT' | 'ACK' | 'PING' | 'PONG'
+export type MessageType = 'CONNECT' | 'CHAT' | 'ACK' | 'PING' | 'PONG' | 'STATUS'
 
 export interface ChatMessage {
   type: MessageType

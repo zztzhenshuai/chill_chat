@@ -25,6 +25,26 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private com.chillchat.mapper.FriendMapper friendMapper;
+
+    private void addBotFriend(Long userId) {
+        QueryWrapper<User> qBot = new QueryWrapper<>();
+        qBot.eq("username", "ChillBot");
+        User bot = userMapper.selectOne(qBot);
+        if (bot != null) {
+             com.chillchat.entity.Friend f1 = new com.chillchat.entity.Friend();
+             f1.setUserId(userId);
+             f1.setFriendId(bot.getId());
+             friendMapper.insert(f1);
+
+             com.chillchat.entity.Friend f2 = new com.chillchat.entity.Friend();
+             f2.setUserId(bot.getId());
+             f2.setFriendId(userId);
+             friendMapper.insert(f2);
+        }
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody LoginRequest req) {
         QueryWrapper<User> query = new QueryWrapper<>();
@@ -38,6 +58,9 @@ public class AuthController {
         user.setPassword(req.getPassword()); // In real world, use BCrypt
         user.setAvatar("https://api.dicebear.com/7.x/avataaars/svg?seed=" + req.getUsername());
         userMapper.insert(user);
+        
+        // Auto add Bot friend
+        addBotFriend(user.getId());
 
         return ResponseEntity.ok("User registered successfully");
     }

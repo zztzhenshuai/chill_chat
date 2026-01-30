@@ -176,19 +176,19 @@ onMounted(() => {
 
 
 <template>
-  <div class="flex-1 flex flex-col bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 h-full relative font-sans overflow-hidden">
+  <div class="flex-1 flex flex-col bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-indigo-900/30 dark:to-purple-900/30 h-full relative font-sans overflow-hidden transition-colors duration-300">
     <!-- Decorative Background blobs -->
-    <div class="absolute top-0 left-1/4 w-96 h-96 bg-indigo-200/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob pointer-events-none"></div>
-    <div class="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000 pointer-events-none"></div>
-    <div class="absolute -bottom-32 left-1/3 w-96 h-96 bg-pink-200/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000 pointer-events-none"></div>
+    <div class="absolute top-0 left-1/4 w-96 h-96 bg-indigo-200/30 dark:bg-indigo-600/20 rounded-full mix-blend-multiply dark:mix-blend-overlay filter blur-3xl opacity-70 animate-blob pointer-events-none"></div>
+    <div class="absolute top-0 right-1/4 w-96 h-96 bg-purple-200/30 dark:bg-purple-600/20 rounded-full mix-blend-multiply dark:mix-blend-overlay filter blur-3xl opacity-70 animate-blob animation-delay-2000 pointer-events-none"></div>
+    <div class="absolute -bottom-32 left-1/3 w-96 h-96 bg-pink-200/30 dark:bg-pink-600/20 rounded-full mix-blend-multiply dark:mix-blend-overlay filter blur-3xl opacity-70 animate-blob animation-delay-4000 pointer-events-none"></div>
 
     <!-- Header -->
-    <div class="h-16 bg-white/40 backdrop-blur-md border-b border-white/20 flex items-center justify-between px-6 sticky top-0 z-20 transition-all duration-300 shadow-sm">
+    <div class="h-16 bg-white/40 dark:bg-gray-800/40 backdrop-blur-md border-b border-white/20 dark:border-gray-700/50 flex items-center justify-between px-6 sticky top-0 z-20 transition-all duration-300 shadow-sm">
       <div class="flex space-x-8">
           <button 
             @click="switchView('all')" 
             class="relative py-4 text-sm font-bold tracking-wide transition-all duration-300"
-            :class="viewMode === 'all' ? 'text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600' : 'text-gray-400 hover:text-gray-600'"
+            :class="viewMode === 'all' ? 'text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
           >
             广场动态
             <span v-if="viewMode === 'all'" class="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full animate-slideIn shadow-[0_0_10px_rgba(139,92,246,0.3)]"></span>
@@ -196,7 +196,7 @@ onMounted(() => {
           <button 
             @click="switchView('my')" 
             class="relative py-4 text-sm font-bold tracking-wide transition-all duration-300"
-            :class="viewMode === 'my' ? 'text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-600' : 'text-gray-400 hover:text-gray-600'"
+            :class="viewMode === 'my' ? 'text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-600 dark:from-pink-400 dark:to-rose-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
           >
             我的帖子
             <span v-if="viewMode === 'my'" class="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-pink-500 to-rose-500 rounded-full animate-slideIn shadow-[0_0_10px_rgba(244,63,94,0.3)]"></span>
@@ -228,23 +228,23 @@ onMounted(() => {
       <div 
         v-for="(post, index) in posts" 
         :key="post.id"
-        class="bg-white rounded-2xl p-6 border border-gray-100 max-w-2xl mx-auto transition-all duration-300 hover:shadow-xl hover:shadow-gray-100 hover:-translate-y-1 group"
+        class="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 max-w-2xl mx-auto transition-all duration-300 hover:shadow-xl hover:shadow-gray-100 dark:hover:shadow-black/30 hover:-translate-y-1 group"
         :style="{ animation: `fadeInUp 0.5s ease-out backwards ${index * 0.1}s` }"
       >
         <!-- Author -->
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center cursor-pointer group/author">
                 <div class="relative">
-                    <img :src="post.avatar" class="w-12 h-12 rounded-full object-cover border-[3px] border-white shadow-sm ring-2 ring-transparent group-hover/author:ring-indigo-100 transition-all duration-300" />
+                    <img :src="post.avatar" class="w-12 h-12 rounded-full object-cover border-[3px] border-white dark:border-gray-700 shadow-sm ring-2 ring-transparent group-hover/author:ring-indigo-100 dark:group-hover/author:ring-indigo-900 transition-all duration-300" />
                     <!-- Online indicator (mock) -->
-                    <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-gradient-to-tr from-green-400 to-emerald-400 border-2 border-white rounded-full"></div>
+                    <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-gradient-to-tr from-green-400 to-emerald-400 border-2 border-white dark:border-gray-700 rounded-full"></div>
                 </div>
                 <div class="ml-3">
-                    <div class="font-bold text-gray-800 text-[15px] tracking-wide group-hover/author:text-indigo-600 transition-colors">{{ post.username }}</div>
+                    <div class="font-bold text-gray-800 dark:text-gray-100 text-[15px] tracking-wide group-hover/author:text-indigo-600 dark:group-hover/author:text-indigo-400 transition-colors">{{ post.username }}</div>
                     <div class="text-xs text-gray-400 mt-0.5 font-medium flex items-center">
                        <span>{{ new Date(post.createTime).toLocaleString() }}</span>
-                       <span class="mx-2 text-gray-200">|</span>
-                       <span class="text-indigo-300">{{ ['上海', '北京', '广州', '深圳'][Math.floor(Math.random()*4)] }}</span>
+                       <span class="mx-2 text-gray-200 dark:text-gray-600">|</span>
+                       <span class="text-indigo-300 dark:text-indigo-400">{{ ['上海', '北京', '广州', '深圳'][Math.floor(Math.random()*4)] }}</span>
                     </div>
                 </div>
             </div>
@@ -253,7 +253,7 @@ onMounted(() => {
             <button 
                v-if="post.userId === currentUserId"
                @click="deletePost(post)"
-               class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100"
+               class="text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100"
                title="删除"
             >
                <el-icon><Delete /></el-icon>
@@ -261,7 +261,7 @@ onMounted(() => {
         </div>
 
         <!-- Content -->
-        <div class="text-gray-700 mb-4 whitespace-pre-wrap text-[15px] leading-relaxed tracking-wide font-normal">{{ post.content }}</div>
+        <div class="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap text-[15px] leading-relaxed tracking-wide font-normal">{{ post.content }}</div>
         
         <!-- Image Grid -->
         <div v-if="post.images && post.images.length > 0" class="mb-5">
@@ -347,10 +347,10 @@ onMounted(() => {
             
             <!-- Input -->
             <div class="flex items-center space-x-2 relative">
-                <img :src="currentUserAvatar" class="w-8 h-8 rounded-full border border-gray-200" v-if="currentUserAvatar" />
+                <img :src="currentUserAvatar" class="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700" v-if="currentUserAvatar" />
                 <input 
                    v-model="commentInputs[post.id]"
-                   class="flex-1 bg-white/50 backdrop-blur-sm border-0 ring-1 ring-gray-200/50 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-400 transition-all shadow-sm pl-4"
+                   class="flex-1 bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm border-0 ring-1 ring-gray-200/50 dark:ring-gray-600/50 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-400 dark:focus:ring-purple-500 transition-all shadow-sm pl-4 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                    placeholder="写下你的评论..." 
                    @keydown.enter="sendComment(post)"
                 />
@@ -373,15 +373,15 @@ onMounted(() => {
     </div>
 
     <div v-if="showCreateModal" class="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div class="bg-white/80 backdrop-blur-2xl rounded-xl shadow-2xl w-full max-w-lg p-6 flex flex-col max-h-[90vh] ring-1 ring-white/60">
+      <div class="bg-white/80 dark:bg-gray-800/90 backdrop-blur-2xl rounded-xl shadow-2xl w-full max-w-lg p-6 flex flex-col max-h-[90vh] ring-1 ring-white/60 dark:ring-gray-700">
          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold">发布新动态</h3>
-            <button @click="showCreateModal = false" class="text-gray-400 hover:text-gray-600 font-bold px-2">✕</button>
+            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">发布新动态</h3>
+            <button @click="showCreateModal = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold px-2">✕</button>
          </div>
 
          <textarea 
             v-model="newPostContent"
-            class="w-full h-32 p-3 border rounded-lg resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none mb-4 bg-gray-50/50"
+            class="w-full h-32 p-3 border rounded-lg resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none mb-4 bg-gray-50/50 dark:bg-gray-700/50 dark:border-gray-600 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             placeholder="分享你的新鲜事..."
          ></textarea>
 
