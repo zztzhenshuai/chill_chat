@@ -5,7 +5,9 @@ import com.chillchat.entity.Friend;
 import com.chillchat.entity.User;
 import com.chillchat.mapper.FriendMapper;
 import com.chillchat.mapper.UserMapper;
+import com.chillchat.service.RedisRateLimiterService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +31,12 @@ public class FriendController {
     @Autowired
     private FriendRequestMapper friendRequestMapper;
 
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private RedisRateLimiterService rateLimiterService;
+
     @GetMapping
     public List<Friend> getFriends(@RequestParam Long userId) {
         List<Friend> friends = friendMapper.selectFriendsWithInfo(userId);
@@ -36,7 +44,13 @@ public class FriendController {
              if ("ChillBot".equals(f.getFriendName())) {
                 f.setIsOnline(true);
             } else {
-                boolean isOnline = TextWebSocketFrameHandler.userChannelMap.containsKey(f.getFriendId());
+                boolean isOnline;
+                try {
+                    Boolean inRedis = stringRedisTemplate.hasKey("online:user:" + f.getFriendId());
+                    isOnline = Boolean.TRUE.equals(inRedis);
+                } catch (Exception ex) {
+                    isOnline = TextWebSocketFrameHandler.userChannelMap.containsKey(f.getFriendId());
+                }
                 f.setIsOnline(isOnline);
             }
         }
@@ -58,6 +72,11 @@ public class FriendController {
     public ResponseEntity<?> sendRequest(@RequestParam Long userId, 
                                        @RequestParam Long friendId, 
                                        @RequestParam(required = false) String reason) {
+        boolean allowed = rateLimiterService.allow("rl:friend:request:user:" + userId, 20, 60);
+        if (!allowed) {
+            return ResponseEntity.status(429).body("Too many friend requests, try later");
+        }
+
         if (userId.equals(friendId)) return ResponseEntity.badRequest().body("Cannot add yourself");
 
         // Check if already friends

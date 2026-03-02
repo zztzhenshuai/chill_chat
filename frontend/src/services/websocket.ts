@@ -1,5 +1,3 @@
-import { ref } from 'vue'
-
 export type MessageType = 'CONNECT' | 'CHAT' | 'ACK' | 'PING' | 'PONG' | 'STATUS'
 
 export interface ChatMessage {
@@ -44,6 +42,9 @@ class ChatSocket {
       try {
         const msg = JSON.parse(event.data) as ChatMessage
         if (msg.type === 'PONG') return
+        if (msg.type === 'CHAT' && msg.id) {
+          this.sendAck(msg)
+        }
         this.onMessageCallback(msg)
       } catch (e) {
         console.error('Parse error', e)
@@ -63,6 +64,18 @@ class ChatSocket {
     } else {
       console.warn('WS not open')
     }
+  }
+
+  private sendAck(msg: ChatMessage) {
+    this.send({
+      type: 'ACK',
+      id: msg.id,
+      senderId: this.userId,
+      targetId: msg.senderId,
+      isGroup: msg.isGroup,
+      content: '',
+      timestamp: Date.now()
+    })
   }
 
   startHeartbeat() {

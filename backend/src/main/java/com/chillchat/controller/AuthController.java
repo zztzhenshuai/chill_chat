@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.chillchat.entity.User;
 import com.chillchat.mapper.UserMapper;
 import com.chillchat.model.LoginRequest;
+import com.chillchat.service.RedisRateLimiterService;
 import com.chillchat.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,6 +30,9 @@ public class AuthController {
 
     @Autowired
     private com.chillchat.mapper.FriendMapper friendMapper;
+
+    @Autowired
+    private RedisRateLimiterService rateLimiterService;
 
     private void addBotFriend(Long userId) {
         QueryWrapper<User> qBot = new QueryWrapper<>();
@@ -66,7 +72,15 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest req) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest req, HttpServletRequest request) {
+        String username = req.getUsername() == null ? "unknown" : req.getUsername().trim().toLowerCase();
+        String clientIp = request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
+        boolean userAllowed = rateLimiterService.allow("rl:login:user:" + username, 10, 60);
+        boolean ipAllowed = rateLimiterService.allow("rl:login:ip:" + clientIp, 30, 60);
+        if (!userAllowed || !ipAllowed) {
+            return ResponseEntity.status(429).body("Too many login attempts, try again later");
+        }
+
         QueryWrapper<User> query = new QueryWrapper<>();
         query.eq("username", req.getUsername())
              .eq("password", req.getPassword());

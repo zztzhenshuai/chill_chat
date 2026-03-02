@@ -8,6 +8,7 @@ import com.chillchat.mapper.CommentMapper;
 import com.chillchat.mapper.PostLikeMapper;
 import com.chillchat.mapper.PostMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,17 @@ public class PostController {
 
     @Autowired
     private PostLikeMapper postLikeMapper;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    private String postLikeCountKey(Long postId) {
+        return "post:like:cnt:" + postId;
+    }
+
+    private String postCommentCountKey(Long postId) {
+        return "post:comment:cnt:" + postId;
+    }
 
     // Get Feed
     @GetMapping
@@ -61,6 +73,13 @@ public class PostController {
                 QueryWrapper<PostLike> query = new QueryWrapper<>();
                 query.eq("post_id", p.getId()).eq("user_id", currentUserId);
                 p.setIsLiked(postLikeMapper.selectCount(query) > 0);
+                try {
+                    String likeCnt = stringRedisTemplate.opsForValue().get(postLikeCountKey(p.getId()));
+                    String commentCnt = stringRedisTemplate.opsForValue().get(postCommentCountKey(p.getId()));
+                    if (likeCnt != null) p.setLikeCount(Integer.parseInt(likeCnt));
+                    if (commentCnt != null) p.setCommentCount(Integer.parseInt(commentCnt));
+                } catch (Exception ignored) {
+                }
             }
         }
         return posts;
@@ -73,6 +92,11 @@ public class PostController {
         post.setCommentCount(0);
         post.setCreateTime(new java.util.Date());
         postMapper.insert(post);
+        try {
+            stringRedisTemplate.opsForValue().set(postLikeCountKey(post.getId()), "0");
+            stringRedisTemplate.opsForValue().set(postCommentCountKey(post.getId()), "0");
+        } catch (Exception ignored) {
+        }
         return post;
     }
 
@@ -100,16 +124,42 @@ public class PostController {
         Post post = postMapper.selectById(postId);
         if (post == null) return ResponseEntity.notFound().build();
 
+        Long newLikeCount = null;
+        try {
+            stringRedisTemplate.opsForValue().setIfAbsent(postLikeCountKey(postId), String.valueOf(post.getLikeCount()));
+        } catch (Exception ignored) {
+        }
+
         if (postLikeMapper.delete(query) > 0) {
             // Unliked
-            post.setLikeCount(post.getLikeCount() > 0 ? post.getLikeCount() - 1 : 0);
+            try {
+                newLikeCount = stringRedisTemplate.opsForValue().decrement(postLikeCountKey(postId));
+                if (newLikeCount != null && newLikeCount < 0) {
+                    stringRedisTemplate.opsForValue().set(postLikeCountKey(postId), "0");
+                    newLikeCount = 0L;
+                }
+            } catch (Exception ignored) {
+            }
+            if (newLikeCount == null) {
+                post.setLikeCount(post.getLikeCount() > 0 ? post.getLikeCount() - 1 : 0);
+            } else {
+                post.setLikeCount(newLikeCount.intValue());
+            }
         } else {
             // Like
             PostLike like = new PostLike();
             like.setPostId(postId);
             like.setUserId(userId);
             postLikeMapper.insert(like);
-            post.setLikeCount(post.getLikeCount() + 1);
+            try {
+                newLikeCount = stringRedisTemplate.opsForValue().increment(postLikeCountKey(postId));
+            } catch (Exception ignored) {
+            }
+            if (newLikeCount == null) {
+                post.setLikeCount(post.getLikeCount() + 1);
+            } else {
+                post.setLikeCount(newLikeCount.intValue());
+            }
         }
         postMapper.updateById(post);
         return ResponseEntity.ok(post.getLikeCount());
@@ -128,7 +178,17 @@ public class PostController {
         commentMapper.insert(comment);
         
         Post post = postMapper.selectById(postId);
-        post.setCommentCount(post.getCommentCount() + 1);
+        Long newCommentCount = null;
+        try {
+            stringRedisTemplate.opsForValue().setIfAbsent(postCommentCountKey(postId), String.valueOf(post.getCommentCount()));
+            newCommentCount = stringRedisTemplate.opsForValue().increment(postCommentCountKey(postId));
+        } catch (Exception ignored) {
+        }
+        if (newCommentCount == null) {
+            post.setCommentCount(post.getCommentCount() + 1);
+        } else {
+            post.setCommentCount(newCommentCount.intValue());
+        }
         postMapper.updateById(post);
         
         return comment; // Note: In real app return comment with user info

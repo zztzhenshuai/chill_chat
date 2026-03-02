@@ -7,12 +7,14 @@ import com.chillchat.mapper.ChatGroupMapper;
 import com.chillchat.mapper.GroupMemberMapper;
 import com.chillchat.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @RestController
@@ -27,6 +29,13 @@ public class GroupController {
     
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    private String groupMembersKey(Long groupId) {
+        return "group:members:" + groupId;
+    }
 
     // Create Group
     @PostMapping("/create")
@@ -56,6 +65,19 @@ public class GroupController {
             gm.setUserId(memberId);
             gm.setJoinTime(new Date());
             groupMemberMapper.insert(gm);
+        }
+
+        try {
+            List<String> allMemberIds = new ArrayList<>();
+            allMemberIds.add(String.valueOf(ownerId));
+            for (Long memberId : memberIds) {
+                allMemberIds.add(String.valueOf(memberId));
+            }
+            String key = groupMembersKey(group.getId());
+            stringRedisTemplate.delete(key);
+            stringRedisTemplate.opsForSet().add(key, allMemberIds.toArray(new String[0]));
+            stringRedisTemplate.expire(key, 1, TimeUnit.HOURS);
+        } catch (Exception ignored) {
         }
 
         return "Group created successfully";

@@ -13,10 +13,12 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -28,6 +30,9 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
 
     @Autowired
     private com.chillchat.mapper.FriendMapper friendMapper;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     // Mapping: UserId -> Channel
     public static final Map<Long, Channel> userChannelMap = new ConcurrentHashMap<>();
@@ -50,7 +55,11 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
                 case CHAT:
                     handleChat(message);
                     break;
+                case ACK:
+                    messageService.handleAck(message);
+                    break;
                 case PING:
+                    refreshOnlineTTL(message.getSenderId());
                     ctx.channel().writeAndFlush(new TextWebSocketFrame("{\"type\":\"PONG\"}"));
                     break;
                 default:
@@ -66,6 +75,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         if (userId != null) {
             userChannelMap.put(userId, ctx.channel());
             channelUserMap.put(ctx.channel().id().asLongText(), userId);
+            markUserOnline(userId);
             System.out.println("User connected: " + userId);
             
             // Notify friends
@@ -84,12 +94,42 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
         Long userId = channelUserMap.remove(channelId);
         if (userId != null) {
             userChannelMap.remove(userId);
+            markUserOffline(userId);
             System.out.println("User disconnected: " + userId);
             
             // Notify friends
             notifyFriendsStatus(userId, false);
         }
         super.channelInactive(ctx);
+    }
+
+    private void markUserOnline(Long userId) {
+        if (userId == null) return;
+        try {
+            String onlineKey = "online:user:" + userId;
+            stringRedisTemplate.opsForValue().set(onlineKey, "1", 90, TimeUnit.SECONDS);
+            stringRedisTemplate.opsForSet().add("online:users", String.valueOf(userId));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void refreshOnlineTTL(Long userId) {
+        if (userId == null) return;
+        try {
+            String onlineKey = "online:user:" + userId;
+            stringRedisTemplate.expire(onlineKey, 90, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void markUserOffline(Long userId) {
+        if (userId == null) return;
+        try {
+            String onlineKey = "online:user:" + userId;
+            stringRedisTemplate.delete(onlineKey);
+            stringRedisTemplate.opsForSet().remove("online:users", String.valueOf(userId));
+        } catch (Exception ignored) {
+        }
     }
 
     private void notifyFriendsStatus(Long userId, boolean isOnline) {
