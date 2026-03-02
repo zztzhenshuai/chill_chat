@@ -9,6 +9,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.timeout.IdleStateHandler;
+import java.util.concurrent.TimeUnit;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
@@ -50,6 +52,8 @@ public class NettyServer {
                                 pipeline.addLast(new HttpServerCodec());
                                 pipeline.addLast(new ChunkedWriteHandler());
                                 pipeline.addLast(new HttpObjectAggregator(65536));
+                                // 60s reader idle check
+                                pipeline.addLast(new IdleStateHandler(60, 0, 0, TimeUnit.SECONDS));
                                 pipeline.addLast(new WebSocketServerProtocolHandler(websocketPath));
                                 pipeline.addLast(textWebSocketFrameHandler);
                             }
