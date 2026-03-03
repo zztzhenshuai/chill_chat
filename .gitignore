@@ -36,3 +36,6 @@ backend/src/main/resources/application-prod.yml
 # Logs
 logs/
 *.log
+
+#txt
+*.txt
