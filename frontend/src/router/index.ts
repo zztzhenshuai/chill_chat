@@ -11,6 +11,7 @@ const routes = [
   },
   {
     path: '/app',
+    meta: { requiresAuth: true },
     component: () => import('@/views/AppLayout.vue'),
     redirect: '/app/chat',
     children: [
@@ -29,6 +30,17 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach((to, _from, next) => {
+  if (to.meta.requiresAuth) {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      next('/login')
+      return
+    }
+  }
+  next()
 })
 
 export default router

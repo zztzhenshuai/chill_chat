@@ -2,8 +2,10 @@ package com.chillchat.controller;
 
 import com.chillchat.entity.User;
 import com.chillchat.mapper.UserMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -13,8 +15,11 @@ public class UserController {
     @Autowired
     private UserMapper userMapper;
 
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
     @PutMapping("/profile")
-    public ResponseEntity<?> updateProfile(@RequestParam Long userId, @RequestBody UpdateRequest updates) {
+    public ResponseEntity<?> updateProfile(@RequestBody UpdateRequest updates, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
         User user = userMapper.selectById(userId);
         if (user == null) return ResponseEntity.notFound().build();
 
@@ -24,10 +29,10 @@ public class UserController {
         
         // Password Change
         if (updates.getNewPassword() != null && !updates.getNewPassword().isEmpty()) {
-            if (updates.getOldPassword() == null || !updates.getOldPassword().equals(user.getPassword())) {
+            if (updates.getOldPassword() == null || !passwordEncoder.matches(updates.getOldPassword(), user.getPassword())) {
                 return ResponseEntity.badRequest().body("旧密码错误");
             }
-            user.setPassword(updates.getNewPassword());
+            user.setPassword(passwordEncoder.encode(updates.getNewPassword()));
         }
 
         if (updates.getAvatar() != null && !updates.getAvatar().isEmpty()) {

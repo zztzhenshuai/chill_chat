@@ -114,7 +114,7 @@ const updateProfile = async () => {
   }
 
   try {
-    const res = await axios.put('/api/user/profile', profileForm.value, { params: { userId: currentUserId }})
+    const res = await axios.put('/api/user/profile', profileForm.value)
     localStorage.setItem('chill_username', res.data.username)
     localStorage.setItem('chill_avatar', res.data.avatar)
     if(res.data.signature) localStorage.setItem('chill_signature', res.data.signature)

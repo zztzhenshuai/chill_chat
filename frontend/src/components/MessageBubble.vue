@@ -9,7 +9,8 @@ const props = defineProps<{
     isSelf: boolean
     type?: string // 'text' | 'image'
   },
-  avatar?: string
+  avatar?: string,
+  senderName?: string
 }>()
 
 const emit = defineEmits(['click-avatar', 'view-image'])
@@ -42,25 +43,33 @@ const handleImageClick = () => {
     </div>
 
     <!-- Bubble -->
-    <div 
-      class="max-w-[70%] rounded-2xl p-3 shadow-sm relative text-sm backdrop-blur-sm transition-colors duration-300"
-      :class="msg.isSelf ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-tr-none shadow-indigo-200 dark:shadow-none' : 'bg-white/80 dark:bg-gray-700/90 text-gray-800 dark:text-gray-100 rounded-tl-none border border-white/50 dark:border-gray-600/50'"
-    >
-      <div v-if="msg.content.startsWith('http')" class="image-content group">
-         <img 
-            v-lazy="msg.content" 
-            class="max-w-[200px] max-h-[250px] rounded-lg cursor-zoom-in object-cover hover:brightness-110 transition shadow-sm" 
-            @click="handleImageClick"
-         />
-      </div>
-      <div v-else class="whitespace-pre-wrap break-words leading-relaxed">{{ msg.content }}</div>
-      
-      <!-- Time -->
+    <div class="flex flex-col min-w-0 flex-1" :class="msg.isSelf ? 'items-end' : 'items-start'">
+      <!-- Sender name (only for others) -->
+      <span
+        v-if="!msg.isSelf && senderName"
+        class="text-xs text-gray-500 dark:text-gray-400 mb-1 px-1"
+      >{{ senderName }}</span>
+
       <div 
-        class="text-xs mt-1 text-right opacity-70"
-        :class="msg.isSelf ? 'text-blue-100' : 'text-gray-400'"
+        class="max-w-[70%] rounded-2xl p-3 shadow-sm relative text-sm backdrop-blur-sm transition-colors duration-300"
+        :class="msg.isSelf ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-tr-none shadow-indigo-200 dark:shadow-none' : 'bg-white/80 dark:bg-gray-700/90 text-gray-800 dark:text-gray-100 rounded-tl-none border border-white/50 dark:border-gray-600/50'"
       >
-        {{ timeSafe }}
+        <div v-if="msg.content.startsWith('http')" class="image-content group">
+           <img 
+              v-lazy="msg.content" 
+              class="max-w-[200px] max-h-[250px] rounded-lg cursor-zoom-in object-cover hover:brightness-110 transition shadow-sm" 
+              @click="handleImageClick"
+           />
+        </div>
+        <div v-else class="whitespace-pre-wrap break-words leading-relaxed">{{ msg.content }}</div>
+        
+        <!-- Time -->
+        <div 
+          class="text-xs mt-1 text-right opacity-70"
+          :class="msg.isSelf ? 'text-blue-100' : 'text-gray-400'"
+        >
+          {{ timeSafe }}
+        </div>
       </div>
     </div>
   </div>

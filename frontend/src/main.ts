@@ -5,6 +5,28 @@ import router from './router'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import axios from 'axios'
+
+// Attach JWT token to every request
+axios.interceptors.request.use(config => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Redirect to login on 401
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.clear()
+      router.push('/login')
+    }
+    return Promise.reject(err)
+  }
+)
 
 // Lazy Load Directive
 const vLazy = {

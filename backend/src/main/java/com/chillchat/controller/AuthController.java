@@ -8,6 +8,7 @@ import com.chillchat.service.RedisRateLimiterService;
 import com.chillchat.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +34,8 @@ public class AuthController {
 
     @Autowired
     private RedisRateLimiterService rateLimiterService;
+
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private void addBotFriend(Long userId) {
         QueryWrapper<User> qBot = new QueryWrapper<>();
@@ -61,7 +64,7 @@ public class AuthController {
 
         User user = new User();
         user.setUsername(req.getUsername());
-        user.setPassword(req.getPassword()); // In real world, use BCrypt
+        user.setPassword(passwordEncoder.encode(req.getPassword()));
         user.setAvatar("https://api.dicebear.com/7.x/avataaars/svg?seed=" + req.getUsername());
         userMapper.insert(user);
         
@@ -82,11 +85,9 @@ public class AuthController {
         }
 
         QueryWrapper<User> query = new QueryWrapper<>();
-        query.eq("username", req.getUsername())
-             .eq("password", req.getPassword());
-        
+        query.eq("username", req.getUsername());
         User user = userMapper.selectOne(query);
-        if (user == null) {
+        if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPassword())) {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 

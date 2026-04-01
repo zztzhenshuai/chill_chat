@@ -306,10 +306,18 @@ onMounted(() => {
              class="flex items-center space-x-1.5 transition-all duration-300 group/btn"
              :class="post.isLiked ? 'text-rose-500' : 'hover:text-rose-500'"
            >
-             <span 
-                class="text-xl transition-transform duration-300"
-                :class="{'scale-125 animate-heart-pop': post.isLiked, 'group-hover/btn:scale-110': !post.isLiked}"
-             >{{ post.isLiked ? '♥' : '♡' }}</span>
+             <svg
+               class="w-5 h-5 transition-transform duration-300"
+               :class="{'scale-125 animate-heart-pop': post.isLiked, 'group-hover/btn:scale-110': !post.isLiked}"
+               viewBox="0 0 24 24"
+               :fill="post.isLiked ? 'currentColor' : 'none'"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+             >
+               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+             </svg>
              <span class="font-medium">{{ post.likeCount || 0 }}</span>
            </button>
 
@@ -318,7 +326,17 @@ onMounted(() => {
              class="flex items-center space-x-1.5 hover:text-indigo-500 transition-all duration-300 group/btn"
              :class="expandedComments[post.id] ? 'text-indigo-500' : ''"
            >
-             <el-icon class="text-xl transition-transform duration-300 group-hover/btn:scale-110"><ChatDotRound /></el-icon>
+             <svg
+               class="w-5 h-5 transition-transform duration-300 group-hover/btn:scale-110"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+             >
+               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+             </svg>
              <span class="font-medium">{{ post.commentCount || 0 }}</span>
            </button>
         </div>

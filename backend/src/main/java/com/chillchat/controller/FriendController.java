@@ -6,6 +6,7 @@ import com.chillchat.entity.User;
 import com.chillchat.mapper.FriendMapper;
 import com.chillchat.mapper.UserMapper;
 import com.chillchat.service.RedisRateLimiterService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,8 @@ public class FriendController {
     private RedisRateLimiterService rateLimiterService;
 
     @GetMapping
-    public List<Friend> getFriends(@RequestParam Long userId) {
+    public List<Friend> getFriends(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
         List<Friend> friends = friendMapper.selectFriendsWithInfo(userId);
         for (Friend f : friends) {
              if ("ChillBot".equals(f.getFriendName())) {
@@ -58,7 +60,8 @@ public class FriendController {
     }
 
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteFriend(@RequestParam Long userId, @RequestParam Long friendId) {
+    public ResponseEntity<?> deleteFriend(@RequestParam Long friendId, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
         QueryWrapper<Friend> query = new QueryWrapper<>();
         query.eq("user_id", userId).eq("friend_id", friendId)
              .or()
@@ -69,9 +72,10 @@ public class FriendController {
     }
 
     @PostMapping("/request")
-    public ResponseEntity<?> sendRequest(@RequestParam Long userId, 
-                                       @RequestParam Long friendId, 
-                                       @RequestParam(required = false) String reason) {
+    public ResponseEntity<?> sendRequest(@RequestParam Long friendId,
+                                         @RequestParam(required = false) String reason,
+                                         HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
         boolean allowed = rateLimiterService.allow("rl:friend:request:user:" + userId, 20, 60);
         if (!allowed) {
             return ResponseEntity.status(429).body("Too many friend requests, try later");
@@ -101,7 +105,8 @@ public class FriendController {
     }
 
     @GetMapping("/requests")
-    public List<FriendRequest> getRequests(@RequestParam Long userId) {
+    public List<FriendRequest> getRequests(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
         return friendRequestMapper.selectPendingRequests(userId);
     }
 

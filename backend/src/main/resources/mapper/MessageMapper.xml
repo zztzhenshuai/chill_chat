@@ -1,5 +1,38 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.chillchat.mapper.MessageMapper">
-    <!-- BaseMapper methods are sufficient specifically for insert -->
+
+    <!--
+        Paginated history query using cursor-based pagination (beforeId).
+        Returns pageSize messages before the given id, ordered ascending.
+        When beforeId = -1, fetch the most recent pageSize messages.
+    -->
+    <select id="selectPagedHistory" resultType="com.chillchat.entity.Message">
+        SELECT * FROM (
+            SELECT * FROM messages
+            <where>
+                <choose>
+                    <when test="isGroup">
+                        target_id = #{targetId}
+                        AND is_group = 1
+                    </when>
+                    <otherwise>
+                        is_group = 0
+                        AND (
+                            (sender_id = #{currentUserId} AND target_id = #{targetId})
+                            OR
+                            (sender_id = #{targetId} AND target_id = #{currentUserId})
+                        )
+                    </otherwise>
+                </choose>
+                <if test="beforeId != -1">
+                    AND id &lt; #{beforeId}
+                </if>
+            </where>
+            ORDER BY create_time DESC
+            LIMIT #{pageSize}
+        ) sub
+        ORDER BY sub.create_time ASC
+    </select>
+
 </mapper>

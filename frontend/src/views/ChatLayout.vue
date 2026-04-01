@@ -29,6 +29,11 @@ const messages = ref<any[]>([])
 const chatContainer = ref<HTMLElement | null>(null)
 const showScrollBtn = ref(false)
 
+// Pagination
+const oldestMessageId = ref<number>(-1)
+const hasMoreHistory = ref(false)
+const isLoadingMore = ref(false)
+
 const showAddFriendModal = ref(false)
 const showRequestsModal = ref(false)
 const showFriendInfoModal = ref(false)
@@ -69,6 +74,117 @@ const showCreateGroupModal = ref(false)
 const newGroupName = ref('')
 const selectedFriendsForGroup = ref<number[]>([])
 
+// Group Management
+const showGroupInfoModal = ref(false)
+const currentGroupInfo = ref<any>(null)
+const currentGroupMembers = ref<any[]>([])
+const editingGroupName = ref('')
+const showInviteModal = ref(false)
+const selectedInviteIds = ref<number[]>([])
+
+// Computed: my role in current group info modal
+const myRoleInCurrentGroup = computed(() =>
+  currentGroupMembers.value.find((m: any) => m.userId === currentUserId)?.role ?? ''
+)
+
+const openGroupInfo = async (groupId: number) => {
+  const group = groups.value.find(g => g.id === groupId)
+  if (!group) return
+  currentGroupInfo.value = { ...group }
+  editingGroupName.value = group.name
+  showGroupInfoModal.value = true
+
+  try {
+    const res = await axios.get(`/api/groups/${groupId}/members`)
+    currentGroupMembers.value = res.data
+  } catch (err) { console.error('Failed to load group members', err) }
+}
+
+const quitGroup = async (groupId: number) => {
+  try {
+    await axios.delete(`/api/groups/${groupId}/quit`)
+    ElMessage.success('已退出群聊')
+    showGroupInfoModal.value = false
+    if (targetId.value === groupId && isGroup.value) {
+      targetId.value = 0
+      messages.value = []
+    }
+    loadGroups()
+  } catch (err: any) {
+    ElMessage.error(err.response?.data || '退出失败')
+  }
+}
+
+const disbandGroup = async (groupId: number) => {
+  try {
+    await axios.delete(`/api/groups/${groupId}`)
+    ElMessage.success('群聊已解散')
+    showGroupInfoModal.value = false
+    if (targetId.value === groupId && isGroup.value) {
+      targetId.value = 0
+      messages.value = []
+    }
+    loadGroups()
+  } catch (err: any) {
+    ElMessage.error(err.response?.data || '解散失败')
+  }
+}
+
+const kickMember = async (groupId: number, userId: number) => {
+  try {
+    await axios.delete(`/api/groups/${groupId}/kick`, { params: { userId } })
+    ElMessage.success('已将该成员移出群聊')
+    currentGroupMembers.value = currentGroupMembers.value.filter(m => m.userId !== userId)
+  } catch (err: any) {
+    ElMessage.error(err.response?.data || '操作失败')
+  }
+}
+
+const updateGroupName = async (groupId: number) => {
+  if (!editingGroupName.value.trim()) return
+  try {
+    await axios.put(`/api/groups/${groupId}`, null, { params: { groupName: editingGroupName.value } })
+    ElMessage.success('群名已更新')
+    const group = groups.value.find(g => g.id === groupId)
+    if (group) group.name = editingGroupName.value
+    if (currentGroupInfo.value) currentGroupInfo.value.name = editingGroupName.value
+  } catch (err: any) {
+    ElMessage.error(err.response?.data || '更新失败')
+  }
+}
+
+const setAdmin = async (groupId: number, userId: number) => {
+  try {
+    const res = await axios.put(`/api/groups/${groupId}/promote`, null, { params: { userId } })
+    ElMessage.success(res.data)
+    // Refresh member list
+    const mRes = await axios.get(`/api/groups/${groupId}/members`)
+    currentGroupMembers.value = mRes.data
+  } catch (err: any) {
+    ElMessage.error(err.response?.data || '操作失败')
+  }
+}
+
+const inviteFriendsToGroup = async () => {
+  if (selectedInviteIds.value.length === 0) return
+  try {
+    const res = await axios.post(`/api/groups/${currentGroupInfo.value.id}/invite`, selectedInviteIds.value)
+    ElMessage.success(res.data)
+    showInviteModal.value = false
+    selectedInviteIds.value = []
+    const mRes = await axios.get(`/api/groups/${currentGroupInfo.value.id}/members`)
+    currentGroupMembers.value = mRes.data
+  } catch (err: any) {
+    ElMessage.error(err.response?.data || '邀请失败')
+  }
+}
+
+// Friends not yet in the current group
+const friendsNotInGroup = computed(() => {
+  const memberIds = new Set(currentGroupMembers.value.map((m: any) => m.userId))
+  return friends.value.filter((f: any) => !memberIds.has(f.id))
+})
+
 const fetchUserInfo = async (userId: number) => {
     if (userCache.value[userId]) return
     try {
@@ -95,7 +211,7 @@ const handleAvatarClick = async (userId: number) => {
 
 const loadGroups = async () => {
     try {
-        const res = await axios.get('/api/groups/my', { params: { userId: currentUserId } })
+        const res = await axios.get('/api/groups/my')
         groups.value = res.data.map((g: any) => ({
             id: g.id,
             name: g.name,
@@ -122,7 +238,6 @@ const createGroup = async () => {
     try {
         await axios.post('/api/groups/create', selectedFriendsForGroup.value, { 
             params: { 
-                ownerId: currentUserId,
                 groupName: newGroupName.value
             }
         })
@@ -139,7 +254,7 @@ const createGroup = async () => {
 const loadFriends = async () => {
   // Load friends
   try {
-    const res = await axios.get('/api/friends', { params: { userId: currentUserId } })
+    const res = await axios.get('/api/friends')
     
     // Map and Cache first
     const list = res.data.map((f: any) => {
@@ -180,7 +295,7 @@ const loadFriends = async () => {
 
   // Load requests
   try {
-      const resReq = await axios.get('/api/friends/requests', { params: { userId: currentUserId }})
+      const resReq = await axios.get('/api/friends/requests')
       pendingRequests.value = resReq.data.map((r: any) => ({
           requestId: r.id,
           name: r.requesterName,
@@ -197,7 +312,6 @@ const sendFriendRequest = async () => {
   try {
     await axios.post('/api/friends/request', null, {
       params: {
-        userId: currentUserId,
         friendId: searchFriendId.value,
         reason: requestReason.value || '你好，交个朋友吧！'
       }
@@ -230,7 +344,7 @@ const deleteFriend = async () => {
     if(!selectedFriend.value) return
     try {
         await axios.delete('/api/friends/delete', {
-            params: { userId: currentUserId, friendId: selectedFriend.value.id }
+            params: { friendId: selectedFriend.value.id }
         })
         ElMessage.success('好友已删除')
         showFriendInfoModal.value = false
@@ -262,12 +376,14 @@ const selectChat = async (id: number, group: boolean) => {
 
 const loadHistory = async () => {
   if (!targetId.value) return
+  oldestMessageId.value = -1
+  hasMoreHistory.value = false
   try {
     const res = await axios.get('/api/messages/history', {
       params: {
-        currentId: currentUserId,
         targetId: targetId.value,
-        isGroup: isGroup.value
+        isGroup: isGroup.value,
+        pageSize: 30
       }
     })
     
@@ -278,7 +394,7 @@ const loadHistory = async () => {
     })
     
     // Map backend entity to frontend format
-    messages.value = res.data.map((m: any) => ({
+    const mapped = res.data.map((m: any) => ({
       type: 'CHAT',
       id: m.id,
       senderId: m.senderId,
@@ -288,9 +404,68 @@ const loadHistory = async () => {
       timestamp: new Date(m.createTime).getTime(),
       isSelf: m.senderId === currentUserId
     }))
+
+    messages.value = mapped
+    if (mapped.length > 0) {
+      oldestMessageId.value = mapped[0].id
+    }
+    hasMoreHistory.value = res.data.length >= 30
     scrollToBottom()
   } catch (err) {
     console.error('Failed to load history', err)
+  }
+}
+
+const loadMoreHistory = async () => {
+  if (!targetId.value || !hasMoreHistory.value || isLoadingMore.value) return
+  if (oldestMessageId.value === -1) return
+
+  isLoadingMore.value = true
+  const container = chatContainer.value
+  const prevScrollHeight = container?.scrollHeight ?? 0
+
+  try {
+    const res = await axios.get('/api/messages/history', {
+      params: {
+        targetId: targetId.value,
+        isGroup: isGroup.value,
+        beforeId: oldestMessageId.value,
+        pageSize: 30
+      }
+    })
+
+    const uids = new Set(res.data.map((m: any) => m.senderId))
+    uids.forEach(uid => {
+      if(!userCache.value[uid as number]) fetchUserInfo(uid as number)
+    })
+
+    const mapped = res.data.map((m: any) => ({
+      type: 'CHAT',
+      id: m.id,
+      senderId: m.senderId,
+      targetId: m.targetId,
+      isGroup: m.isGroup,
+      content: m.content,
+      timestamp: new Date(m.createTime).getTime(),
+      isSelf: m.senderId === currentUserId
+    }))
+
+    messages.value = [...mapped, ...messages.value]
+    if (mapped.length > 0) {
+      oldestMessageId.value = mapped[0].id
+    }
+    hasMoreHistory.value = res.data.length >= 30
+
+    // Restore scroll so the user's view doesn't jump
+    nextTick(() => {
+      if (container) {
+        container.scrollTop = container.scrollHeight - prevScrollHeight
+      }
+    })
+  } catch (err) {
+    console.error('Failed to load more history', err)
+  } finally {
+    isLoadingMore.value = false
   }
 }
 
@@ -387,6 +562,10 @@ const handleScroll = () => {
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
   if (scrollHeight - scrollTop - clientHeight < 50) {
     showScrollBtn.value = false
+  }
+  // Load older messages when scrolled to top
+  if (scrollTop <= 10 && hasMoreHistory.value && !isLoadingMore.value) {
+    loadMoreHistory()
   }
 }
 
@@ -535,9 +714,20 @@ const isSelectedUserFriend = computed(() => {
                 @click="selectChat(group.id, true)"
               >
                 <img :src="group.avatar" class="w-10 h-10 rounded-full mr-3 border border-gray-200 dark:border-gray-600" />
-                <div>
-                  <div class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ group.name }}</div>
-                  <div class="text-xs text-gray-400">群聊</div>
+                <div class="flex-1">
+                  <div class="flex justify-between items-center">
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ group.name }}</div>
+                    <!-- Group Unread Badge -->
+                    <div 
+                      v-if="unreadCounts['g-' + group.id] > 0"
+                      class="bg-red-500 text-white text-[10px] h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center font-bold"
+                    >
+                      {{ unreadCounts['g-' + group.id] > 99 ? '99+' : unreadCounts['g-' + group.id] }}
+                    </div>
+                  </div>
+                  <div class="text-xs text-gray-400">
+                    <span>群聊</span>
+                  </div>
                 </div>
               </div>
           </div>
@@ -643,6 +833,18 @@ const isSelectedUserFriend = computed(() => {
         <span class="font-bold text-gray-800 dark:text-gray-100 tracking-wide">
           {{ targetId ? (isGroup ? (groups.find(g => g.id === targetId)?.name || '群组 ' + targetId) : (userCache[targetId]?.name || '用户 ' + targetId)) : '选择一个聊天' }}
         </span>
+        <!-- Group management button -->
+        <button
+          v-if="isGroup && targetId"
+          @click="openGroupInfo(targetId)"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+          title="群组详情"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87m6-4.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-2 0" />
+          </svg>
+          群组详情
+        </button>
       </div>
 
       <!-- Messages -->
@@ -655,12 +857,21 @@ const isSelectedUserFriend = computed(() => {
            <div class="text-6xl mb-4 opacity-30 animate-pulse">💬</div>
            <p>选择好友开始聊天</p>
         </div>
+
+        <!-- Load More Indicator -->
+        <div v-if="isLoadingMore" class="flex justify-center py-2">
+          <span class="text-xs text-gray-400 animate-pulse">加载更多消息...</span>
+        </div>
+        <div v-else-if="targetId && !hasMoreHistory && messages.length > 0" class="flex justify-center py-1">
+          <span class="text-xs text-gray-300 dark:text-gray-600">— 已无更多消息 —</span>
+        </div>
         
         <MessageBubble 
           v-for="(m, idx) in messages" 
           :key="idx" 
           :msg="m"
           :avatar="userCache[m.senderId]?.avatar"
+          :senderName="isGroup && !m.isSelf ? (userCache[m.senderId]?.name || ('用户 ' + m.senderId)) : undefined"
           @click-avatar="handleAvatarClick"
           @view-image="openPreview"
         />
@@ -841,6 +1052,110 @@ const isSelectedUserFriend = computed(() => {
              </div>
           </div>
        </div>
+    </div>
+
+    <!-- Group Info Modal -->
+    <div v-if="showGroupInfoModal && currentGroupInfo" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div class="bg-white dark:bg-gray-800 rounded-xl w-96 shadow-2xl overflow-hidden relative animate-fade-in max-h-[85vh] flex flex-col">
+        <div class="h-20 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center px-5">
+          <img :src="currentGroupInfo.avatar" class="w-12 h-12 rounded-full border-2 border-white mr-3" />
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-white text-base truncate">{{ currentGroupInfo.name }}</div>
+            <div class="text-indigo-200 text-xs">{{ currentGroupMembers.length }} 位成员</div>
+          </div>
+          <button @click="showGroupInfoModal = false" class="text-white hover:opacity-70 ml-2 text-xl">✕</button>
+        </div>
+
+        <!-- Owner: rename group -->
+        <div v-if="myRoleInCurrentGroup === 'owner'" class="px-4 pt-3 flex space-x-2">
+          <input 
+            v-model="editingGroupName"
+            class="flex-1 border rounded px-2 py-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:border-indigo-400"
+            placeholder="修改群名..."
+          />
+          <button @click="updateGroupName(currentGroupInfo.id)" class="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600">
+            保存
+          </button>
+        </div>
+
+        <!-- Members List -->
+        <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          <div class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">成员列表</div>
+          <div v-for="member in currentGroupMembers" :key="member.userId" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+            <img :src="member.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.userId}`" class="w-9 h-9 rounded-full" />
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center space-x-1">
+                <span class="truncate">{{ member.username }}</span>
+                <span v-if="member.role === 'owner'" class="text-[10px] bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400 px-1.5 py-0.5 rounded-full">群主</span>
+                <span v-else-if="member.role === 'admin'" class="text-[10px] bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 px-1.5 py-0.5 rounded-full">管理员</span>
+              </div>
+              <div class="text-xs text-gray-400">ID: {{ member.userId }}</div>
+            </div>
+            <div class="flex items-center gap-1">
+              <!-- Set/unset admin: only owner can do this, for non-owner members -->
+              <button
+                v-if="myRoleInCurrentGroup === 'owner' && member.userId !== currentUserId"
+                @click="setAdmin(currentGroupInfo.id, member.userId)"
+                class="text-blue-400 hover:text-blue-600 text-xs px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition"
+              >{{ member.role === 'admin' ? '撤销管理' : '设为管理' }}</button>
+              <!-- Kick: owner can kick anyone, admin can kick regular members only -->
+              <button
+                v-if="(myRoleInCurrentGroup === 'owner' && member.userId !== currentUserId) || (myRoleInCurrentGroup === 'admin' && member.role === 'member')"
+                @click="kickMember(currentGroupInfo.id, member.userId)"
+                class="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+              >移出</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-2">
+          <button @click="showGroupInfoModal = false" class="flex-1 border border-gray-300 dark:border-gray-600 py-1.5 rounded text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">关闭</button>
+          <!-- Owner or admin: invite friends -->
+          <button
+            v-if="myRoleInCurrentGroup === 'owner' || myRoleInCurrentGroup === 'admin'"
+            @click="showInviteModal = true"
+            class="flex-1 bg-indigo-50 text-indigo-600 border border-indigo-200 py-1.5 rounded hover:bg-indigo-100 text-sm dark:bg-indigo-900/30 dark:border-indigo-700 dark:text-indigo-300"
+          >邀请好友</button>
+          <!-- Non-owner: quit button -->
+          <button 
+            v-if="myRoleInCurrentGroup !== 'owner'"
+            @click="quitGroup(currentGroupInfo.id)"
+            class="flex-1 bg-orange-50 text-orange-500 border border-orange-200 py-1.5 rounded hover:bg-orange-100 text-sm"
+          >退出群聊</button>
+          <!-- Owner: disband button -->
+          <button 
+            v-if="myRoleInCurrentGroup === 'owner'"
+            @click="disbandGroup(currentGroupInfo.id)"
+            class="flex-1 bg-red-50 text-red-500 border border-red-100 py-1.5 rounded hover:bg-red-100 text-sm"
+          >解散群聊</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invite Friends Sub-Modal -->
+    <div v-if="showInviteModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center">
+      <div class="bg-white dark:bg-gray-800 rounded-xl w-80 shadow-2xl overflow-hidden animate-fade-in max-h-[70vh] flex flex-col">
+        <div class="h-12 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center px-4 justify-between">
+          <span class="font-bold text-white text-sm">邀请好友进群</span>
+          <button @click="showInviteModal = false; selectedInviteIds = []" class="text-white hover:opacity-70 text-xl">✕</button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+          <div v-if="friendsNotInGroup.length === 0" class="text-sm text-gray-400 text-center py-4">所有好友已在群内</div>
+          <label
+            v-for="f in friendsNotInGroup" :key="f.id"
+            class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+          >
+            <input type="checkbox" :value="f.id" v-model="selectedInviteIds" class="accent-indigo-500" />
+            <img :src="f.avatar" class="w-8 h-8 rounded-full" />
+            <span class="text-sm text-gray-800 dark:text-gray-200">{{ f.name }}</span>
+          </label>
+        </div>
+        <div class="px-3 py-3 border-t border-gray-100 dark:border-gray-700 flex space-x-2">
+          <button @click="showInviteModal = false; selectedInviteIds = []" class="flex-1 border border-gray-300 dark:border-gray-600 py-1.5 rounded text-gray-600 dark:text-gray-400 hover:bg-gray-50 text-sm">取消</button>
+          <button @click="inviteFriendsToGroup" :disabled="selectedInviteIds.length === 0" class="flex-1 bg-indigo-500 text-white py-1.5 rounded hover:bg-indigo-600 text-sm disabled:opacity-40">邀请 {{ selectedInviteIds.length > 0 ? `(${selectedInviteIds.length})` : '' }}</button>
+        </div>
+      </div>
     </div>
 
     <!-- Image Preview Modal -->
