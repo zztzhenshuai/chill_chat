@@ -13,6 +13,7 @@ import io.netty.channel.Channel;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -52,9 +53,13 @@ public class BotService implements InitializingBean {
     @Autowired
     private MessageEmbeddingMapper messageEmbeddingMapper;
 
+    // ─── Config ──────────────────────────────────────────────────────────────
+
+    @Value("${dashscope.api-key}")
+    private String apiKey;
+
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    private static final String API_KEY = "sk-dfe51496b73a4dab81bc5d268f2aba0c";
     private static final String API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
     private static final String MODEL_NAME = "qwen-turbo";
 
@@ -302,7 +307,7 @@ public class BotService implements InitializingBean {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(new URI(API_URL))
-                .header("Authorization", "Bearer " + API_KEY)
+                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload.toString(), StandardCharsets.UTF_8))
                 .build();

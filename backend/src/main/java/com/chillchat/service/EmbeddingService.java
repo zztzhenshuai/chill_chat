@@ -6,6 +6,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.chillchat.entity.MessageEmbedding;
 import com.chillchat.mapper.MessageEmbeddingMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +20,9 @@ import java.util.Date;
 @Service
 public class EmbeddingService {
 
-    private static final String API_KEY = "sk-dfe51496b73a4dab81bc5d268f2aba0c";
+    @Value("${dashscope.api-key}")
+    private String apiKey;
+
     private static final String EMBEDDING_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings";
     private static final String EMBEDDING_MODEL = "text-embedding-v3";
 
@@ -41,7 +44,7 @@ public class EmbeddingService {
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(new URI(EMBEDDING_URL))
-                    .header("Authorization", "Bearer " + API_KEY)
+                    .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8))
                     .build();
