@@ -6,6 +6,10 @@ import { Picture, Delete, ChatDotRound } from '@element-plus/icons-vue'
 
 const posts = ref<any[]>([])
 const loading = ref(false)
+const loadingMore = ref(false)
+const hasMore = ref(true)
+const currentPage = ref(1)
+const PAGE_SIZE = 20
 const showCreateModal = ref(false)
 const newPostContent = ref('')
 const newPostImages = ref<string[]>([])
@@ -29,20 +33,48 @@ const openPreview = (url: string) => {
 
 const loadFeed = async () => {
   loading.value = true
+  currentPage.value = 1
+  hasMore.value = true
   try {
-    const params: any = { currentUserId }
+    const params: any = { currentUserId, page: 1, size: PAGE_SIZE }
     if (viewMode.value === 'my') {
         params.filterUserId = currentUserId
     }
     const res = await axios.get('/api/posts', { params })
-    posts.value = res.data.map((p: any) => ({
+    const data = res.data.map((p: any) => ({
         ...p,
         images: p.imageUrl ? p.imageUrl.split(',') : []
     }))
+    posts.value = data
+    hasMore.value = data.length === PAGE_SIZE
   } catch (err) {
     ElMessage.error('加载动态失败')
   } finally {
     loading.value = false
+  }
+}
+
+const loadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    const nextPage = currentPage.value + 1
+    const params: any = { currentUserId, page: nextPage, size: PAGE_SIZE }
+    if (viewMode.value === 'my') {
+        params.filterUserId = currentUserId
+    }
+    const res = await axios.get('/api/posts', { params })
+    const data = res.data.map((p: any) => ({
+        ...p,
+        images: p.imageUrl ? p.imageUrl.split(',') : []
+    }))
+    posts.value.push(...data)
+    currentPage.value = nextPage
+    hasMore.value = data.length === PAGE_SIZE
+  } catch (err) {
+    ElMessage.error('加载更多失败')
+  } finally {
+    loadingMore.value = false
   }
 }
 
@@ -225,8 +257,8 @@ onMounted(() => {
           <p class="text-gray-400 font-light">这里还是一片荒原，去种下第一棵树吧</p>
       </div>
       
-      <div 
-        v-for="(post, index) in posts" 
+      <div
+        v-for="(post, index) in posts"
         :key="post.id"
         class="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 max-w-2xl mx-auto transition-all duration-300 hover:shadow-xl hover:shadow-gray-100 dark:hover:shadow-black/30 hover:-translate-y-1 group"
         :style="{ animation: `fadeInUp 0.5s ease-out backwards ${index * 0.1}s` }"
@@ -381,6 +413,20 @@ onMounted(() => {
                 </button>
             </div>
         </div>
+      </div>
+
+      <!-- Load More -->
+      <div class="flex justify-center py-6 max-w-2xl mx-auto w-full">
+        <button
+          v-if="hasMore && !loading"
+          @click="loadMore"
+          :disabled="loadingMore"
+          class="flex items-center space-x-2 px-8 py-2.5 rounded-full border border-indigo-200 dark:border-indigo-700 text-indigo-500 dark:text-indigo-400 text-sm font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-300 disabled:opacity-60"
+        >
+          <span v-if="loadingMore" class="w-4 h-4 border-2 border-indigo-300 border-t-indigo-500 rounded-full animate-spin"></span>
+          <span>{{ loadingMore ? '加载中...' : '加载更多' }}</span>
+        </button>
+        <p v-else-if="!hasMore && posts.length > 0" class="text-gray-400 dark:text-gray-600 text-xs">— 已经到底了 —</p>
       </div>
     </div>
 
