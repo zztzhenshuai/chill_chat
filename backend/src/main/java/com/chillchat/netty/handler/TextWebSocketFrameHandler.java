@@ -3,8 +3,7 @@ package com.chillchat.netty.handler;
 import com.alibaba.fastjson2.JSON;
 import com.chillchat.model.ChatMessage;
 import com.chillchat.model.MessageType;
-import com.chillchat.service.KafkaConsumerService; // Used as Direct Message Service now
-// import com.chillchat.service.KafkaProducerService;
+import com.chillchat.service.MessageDispatchService;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -26,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
 
     @Autowired
-    private KafkaConsumerService messageService; // Was kafkaProducerService
+    private MessageDispatchService messageService;
 
     @Autowired
     private com.chillchat.mapper.FriendMapper friendMapper;
@@ -84,7 +83,7 @@ public class TextWebSocketFrameHandler extends SimpleChannelInboundHandler<TextW
     }
 
     private void handleChat(ChatMessage message) {
-        // Send directly to service, bypassing Kafka
+        // Dispatch message directly via MessageDispatchService
         messageService.processMessage(message);
     }
 

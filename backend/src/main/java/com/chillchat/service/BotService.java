@@ -210,7 +210,7 @@ public class BotService implements InitializingBean {
                 }
             }
 
-            // ── STEP 2: Find the user message ID saved by KafkaConsumerService ─
+            // ── STEP 2: Find the user message ID saved by MessageDispatchService ─
             Long userMsgId = findRecentUserMessage(userId, userMsg.getContent());
 
             // ── STEP 3: Build hybrid context ──────────────────────────────────

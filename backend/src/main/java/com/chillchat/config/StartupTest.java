@@ -4,7 +4,7 @@ import com.chillchat.entity.Message;
 import com.chillchat.mapper.MessageMapper;
 import com.chillchat.model.ChatMessage;
 import com.chillchat.model.MessageType;
-import com.chillchat.service.KafkaConsumerService;
+import com.chillchat.service.MessageDispatchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ public class StartupTest implements CommandLineRunner {
     private MessageMapper messageMapper;
     
     @Autowired
-    private KafkaConsumerService kafkaConsumerService;
+    private MessageDispatchService messageDispatchService;
 
     @Override
     public void run(String... args) throws Exception {
@@ -36,9 +36,9 @@ public class StartupTest implements CommandLineRunner {
             chatMsg.setContent("Service Test Message " + new Date());
             chatMsg.setTimestamp(System.currentTimeMillis());
             
-            kafkaConsumerService.processMessage(chatMsg);
-            
-            System.out.println("KafkaConsumerService.processMessage executed successfully.");
+            messageDispatchService.processMessage(chatMsg);
+
+            System.out.println("MessageDispatchService.processMessage executed successfully.");
         } catch (Exception e) {
             System.err.println("Startup Test Failed!");
             e.printStackTrace();

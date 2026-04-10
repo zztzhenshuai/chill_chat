@@ -10,10 +10,8 @@ import com.chillchat.model.ChatMessage;
 import com.chillchat.netty.handler.TextWebSocketFrameHandler;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +21,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Service
-public class KafkaConsumerService {
+public class MessageDispatchService {
 
     private static final long PENDING_RETRY_INTERVAL_MS = 15000L;
     private static final int MAX_PENDING_RETRY = 5;
@@ -196,10 +194,6 @@ public class KafkaConsumerService {
         return memberIds;
     }
 
-    // @KafkaListener(topics = "chat-msg-topic", groupId = "chill-chat-group")
-    // public void consume(List<ConsumerRecord<String, String>> records) { ... }
-
-    // Direct processing method to bypass Kafka
     public void processMessage(ChatMessage chatMessage) {
         if (chatMessage == null) return;
 
@@ -220,45 +214,35 @@ public class KafkaConsumerService {
             entity.setIsGroup(chatMessage.getIsGroup());
             entity.setContent(chatMessage.getContent());
             entity.setCreateTime(new Date(chatMessage.getTimestamp()));
-            
-            // System.out.println("Saving message: " + JSON.toJSONString(entity));
             messageMapper.insert(entity);
             chatMessage.setId(entity.getId());
 
-            // 2. Push to WebSocket if local
+            // 2. Push to WebSocket
             String jsonMsg = JSON.toJSONString(chatMessage);
             
             if (chatMessage.getIsGroup()) {
-                // Group Logic: Broadcast to all members except sender
+                // Group: broadcast to all members except sender
                 List<Long> members = getGroupMemberIds(chatMessage.getTargetId());
-                
                 for (Long memberId : members) {
-                    if (memberId.equals(chatMessage.getSenderId())) {
-                        continue; // Skip sender
-                    }
-
+                    if (memberId.equals(chatMessage.getSenderId())) continue;
                     savePending(memberId, chatMessage, 0, System.currentTimeMillis() + PENDING_RETRY_INTERVAL_MS);
-                    
                     Channel channel = TextWebSocketFrameHandler.userChannelMap.get(memberId);
                     if (channel != null && channel.isActive()) {
                         channel.writeAndFlush(new TextWebSocketFrame(jsonMsg));
                     }
                 }
             } else {
-                // Private Chat
+                // Private chat
                 savePending(chatMessage.getTargetId(), chatMessage, 0, System.currentTimeMillis() + PENDING_RETRY_INTERVAL_MS);
                 Channel targetChannel = TextWebSocketFrameHandler.userChannelMap.get(chatMessage.getTargetId());
                 if (targetChannel != null && targetChannel.isActive()) {
                     targetChannel.writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(chatMessage)));
-                } else {
-                     // User offline
-                     // System.out.println("User offline: " + chatMessage.getTargetId());
                 }
             }
 
             // 3. Trigger Bot Response (Async)
             botService.handleBotResponse(chatMessage);
-            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
