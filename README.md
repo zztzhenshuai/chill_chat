@@ -171,6 +171,31 @@ npm run dev
 
 ---
 
-## 📄 License
+## � 安全加固与质量优化
+
+本项目在基础功能完成后进行了一轮系统性的安全与质量加固，主要改动如下：
+
+### 消息发送权限校验（WebSocket 层）
+`MessageDispatchService.processMessage()` 在持久化与推送消息前增加前置校验：
+- **私聊**：校验发送者与接收者是否存在好友关系（`FriendMapper.countFriendship`），非好友消息静默丢弃；Bot 消息自动放行
+- **群聊**：校验发送者是否为该群成员（`GroupMemberMapper.selectCount`），非成员消息静默丢弃
+
+### REST API 权限校验
+- `FriendController.respondRequest()`（好友申请响应）：校验当前登录用户是否为申请的接收方，防止越权操作（IDOR）
+- `MessageController.getHistory()`（消息历史查询）：私聊接口校验双方好友关系，群聊接口校验当前用户群成员资格
+
+### 性能优化
+- `GroupController.getMembers()`：将 N+1 逐行查询改为 `selectBatchIds()` 批量加载，降至 2 次查询
+- `PostController`：新增分页查询（基于 `PostMapper` 新增的 `selectByPage`），废弃全量加载逻辑
+
+### 代码分层
+- 抽取 `PostService`、`FriendService` 服务层，Controller 不再直接操作 Mapper
+
+### 依赖清理
+- 移除未使用的 Kafka 依赖（`spring-kafka`），消息分发统一由 `MessageDispatchService` 负责
+
+---
+
+## �📄 License
 
 MIT

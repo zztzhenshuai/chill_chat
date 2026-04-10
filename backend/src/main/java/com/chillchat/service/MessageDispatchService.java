@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.chillchat.entity.GroupMember;
 import com.chillchat.entity.Message;
+import com.chillchat.mapper.FriendMapper;
 import com.chillchat.mapper.GroupMemberMapper;
 import com.chillchat.mapper.MessageMapper;
 import com.chillchat.model.ChatMessage;
@@ -31,6 +32,9 @@ public class MessageDispatchService {
     
     @Autowired
     private GroupMemberMapper groupMemberMapper;
+
+    @Autowired
+    private FriendMapper friendMapper;
 
     @Autowired
     private BotService botService;
@@ -197,6 +201,28 @@ public class MessageDispatchService {
     public void processMessage(ChatMessage chatMessage) {
         if (chatMessage == null) return;
 
+        Long senderId = chatMessage.getSenderId();
+        Long targetId = chatMessage.getTargetId();
+        boolean isGroup = Boolean.TRUE.equals(chatMessage.getIsGroup());
+
+        if (senderId == null || targetId == null) return;
+
+        // 验证发送者是否有权限发送此消息
+        if (isGroup) {
+            // 群聊：校验发送者是否是该群成员
+            QueryWrapper<GroupMember> memberCheck = new QueryWrapper<>();
+            memberCheck.eq("group_id", targetId).eq("user_id", senderId);
+            if (groupMemberMapper.selectCount(memberCheck) == 0) {
+                return; // 非群成员，拖弃消息
+            }
+        } else {
+            // 私聊：校验双方是否为好友（Bot 消息放行）
+            if (!botService.isBot(senderId) && !botService.isBot(targetId)
+                    && friendMapper.countFriendship(senderId, targetId) == 0) {
+                return; // 非好友且非 Bot，丢弃消息
+            }
+        }
+
         try {
             String dedupToken = buildDedupToken(chatMessage);
             if (!firstSeen(dedupToken)) {
@@ -209,8 +235,8 @@ public class MessageDispatchService {
 
             // 1. Persist to MySQL
             Message entity = new Message();
-            entity.setSenderId(chatMessage.getSenderId());
-            entity.setTargetId(chatMessage.getTargetId());
+            entity.setSenderId(senderId);
+            entity.setTargetId(targetId);
             entity.setIsGroup(chatMessage.getIsGroup());
             entity.setContent(chatMessage.getContent());
             entity.setCreateTime(new Date(chatMessage.getTimestamp()));
@@ -220,7 +246,7 @@ public class MessageDispatchService {
             // 2. Push to WebSocket
             String jsonMsg = JSON.toJSONString(chatMessage);
             
-            if (chatMessage.getIsGroup()) {
+            if (isGroup) {
                 // Group: broadcast to all members except sender
                 List<Long> members = getGroupMemberIds(chatMessage.getTargetId());
                 for (Long memberId : members) {
