@@ -136,9 +136,18 @@ public class GroupController {
         qw.eq("group_id", groupId);
         List<GroupMember> members = groupMemberMapper.selectList(qw);
 
+        if (members.isEmpty()) return ResponseEntity.ok(new ArrayList<>());
+
+        // R-4 修复：收集所有 userId，一次批量查询代替 N+1 逐条查询
+        List<Long> userIds = members.stream()
+                .map(GroupMember::getUserId)
+                .collect(Collectors.toList());
+        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (GroupMember gm : members) {
-            User user = userMapper.selectById(gm.getUserId());
+            User user = userMap.get(gm.getUserId());
             if (user == null) continue;
             Map<String, Object> m = new HashMap<>();
             m.put("userId", user.getId());
