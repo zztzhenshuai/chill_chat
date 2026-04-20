@@ -1,5 +1,7 @@
 package com.chillchat.service;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.chillchat.entity.Comment;
 import com.chillchat.entity.Post;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class PostService {
@@ -148,5 +151,32 @@ public class PostService {
 
     public List<Comment> getComments(Long postId) {
         return commentMapper.selectCommentsByPostId(postId);
+    }
+
+    // ── Benchmark helpers ────────────────────────────────────────────────────
+
+    /** 直接查 MySQL，不经过任何缓存（benchmark 基准线） */
+    public List<Post> getFeedDirectMySQL(int page, int size) {
+        int offset = (page - 1) * size;
+        return postMapper.selectAllPostsPaged(offset, size);
+    }
+
+    /** Cache-Aside 模式：命中 Redis 则直接返回，否则查 MySQL 后写入缓存 */
+    public List<Post> getFeedRedisCache(int page, int size) {
+        String key = "bench:feed:p" + page + ":s" + size;
+        try {
+            String json = stringRedisTemplate.opsForValue().get(key);
+            if (json != null) {
+                return JSON.parseObject(json, new TypeReference<List<Post>>() {});
+            }
+        } catch (Exception ignored) {
+        }
+        int offset = (page - 1) * size;
+        List<Post> posts = postMapper.selectAllPostsPaged(offset, size);
+        try {
+            stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(posts), 30, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+        }
+        return posts;
     }
 }
