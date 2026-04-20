@@ -229,16 +229,24 @@ public class BotService implements InitializingBean {
                 String finishReason = llmResponse.getString("finish_reason");
                 JSONObject message = llmResponse.getJSONObject("message");
 
-                // 检测幻觉执行：模型在文本中模拟了工具结果，强制重试
-                if (!"tool_calls".equals(finishReason) && iter == 0) {
-                    String preliminary = message.getString("content");
-                    if (looksLikeFakeToolExecution(preliminary)) {
-                        System.out.println("[BotService] Detected hallucinated tool execution, retrying with tool_choice=required");
-                        llmResponse = callLLM(messages, tools, "required");
-                        if (llmResponse == null) break;
-                        finishReason = llmResponse.getString("finish_reason");
-                        message = llmResponse.getJSONObject("message");
-                    }
+                // 检测幻觉执行：每一轮都检查；单轮最多强制重试一次，避免无限重试
+                final int maxHallucinationRetriesPerIter = 1;
+                int hallucinationRetryCount = 0;
+                while (!"tool_calls".equals(finishReason)
+                        && looksLikeFakeToolExecution(message.getString("content"))
+                        && hallucinationRetryCount < maxHallucinationRetriesPerIter) {
+                    hallucinationRetryCount++;
+                    System.out.println("[BotService] Detected hallucinated tool execution, retrying with tool_choice=required (iter="
+                            + iter + ", retry=" + hallucinationRetryCount + ")");
+                    llmResponse = callLLM(messages, tools, "required");
+                    if (llmResponse == null) break;
+                    finishReason = llmResponse.getString("finish_reason");
+                    message = llmResponse.getJSONObject("message");
+                }
+                if (llmResponse == null) break;
+                if (!"tool_calls".equals(finishReason)
+                        && looksLikeFakeToolExecution(message.getString("content"))) {
+                    System.out.println("[BotService] Hallucinated tool execution detected but retry limit reached in this iteration.");
                 }
 
                 if ("tool_calls".equals(finishReason)) {
