@@ -15,6 +15,9 @@ class ChatSocket {
   private url: string = 'ws://localhost:9090/ws'
   private heartbeatInterval: any = null
   private userId: number = 0
+  private seenMessageIds: Set<number> = new Set()
+  private seenMessageOrder: number[] = []
+  private readonly maxSeenMessageIds: number = 2000
   
   public onMessageCallback: (msg: ChatMessage) => void = () => {}
 
@@ -43,7 +46,10 @@ class ChatSocket {
         const msg = JSON.parse(event.data) as ChatMessage
         if (msg.type === 'PONG') return
         if (msg.type === 'CHAT' && msg.id) {
+          const isDuplicate = this.seenMessageIds.has(msg.id)
           this.sendAck(msg)
+          if (isDuplicate) return
+          this.rememberMessageId(msg.id)
         }
         this.onMessageCallback(msg)
       } catch (e) {
@@ -102,6 +108,18 @@ class ChatSocket {
     }
     this.stopHeartbeat()
     this.userId = 0
+  }
+
+  private rememberMessageId(id: number) {
+    this.seenMessageIds.add(id)
+    this.seenMessageOrder.push(id)
+
+    if (this.seenMessageOrder.length > this.maxSeenMessageIds) {
+      const evicted = this.seenMessageOrder.shift()
+      if (evicted !== undefined) {
+        this.seenMessageIds.delete(evicted)
+      }
+    }
   }
 }
 
